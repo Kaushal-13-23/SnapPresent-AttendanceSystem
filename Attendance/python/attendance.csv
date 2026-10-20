@@ -1,0 +1,7 @@
+Enrollment,Name,2026-03-26,2026-03-29,Attendance
+1234,"<StringArray>
+['kaushal']
+Length: 1, dtype: str",1,0.0,50%
+1234,['kaushal'],1,0.0,50%
+2021,['kaushal'],1,1.0,100%
+3456,['Hritik'],1,0.0,50%

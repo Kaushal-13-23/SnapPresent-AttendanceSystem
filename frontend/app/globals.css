@@ -1,0 +1,157 @@
+@import "tailwindcss";
+
+:root {
+  --canvas: #FBF9FF;
+  --surface: #FFFFFF;
+  --surface-tint: #F4EFFF;
+  --line: #E7E0F5;
+  --ink: #2B2A3A;
+  --ink-dim: #6E6C86;
+  --lilac: #C9B6F2;
+  --lilac-deep: #8F76D9;
+  --mint: #BDEBD6;
+  --mint-ink: #1F6B50;
+  --peach: #FFD3BD;
+  --peach-ink: #8A4A2B;
+  --sky: #BFE0FF;
+  --sky-ink: #24577F;
+  --butter: #FFF1B8;
+  --butter-ink: #7A6212;
+  --rose: #FFC8D6;
+  --rose-ink: #8C2F4B;
+}
+
+@theme {
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-surface-tint: var(--surface-tint);
+  --color-line: var(--line);
+  --color-ink: var(--ink);
+  --color-ink-dim: var(--ink-dim);
+  --color-lilac: var(--lilac);
+  --color-lilac-deep: var(--lilac-deep);
+  --color-mint: var(--mint);
+  --color-mint-ink: var(--mint-ink);
+  --color-peach: var(--peach);
+  --color-peach-ink: var(--peach-ink);
+  --color-sky: var(--sky);
+  --color-sky-ink: var(--sky-ink);
+  --color-butter: var(--butter);
+  --color-butter-ink: var(--butter-ink);
+  --color-rose: var(--rose);
+  --color-rose-ink: var(--rose-ink);
+
+  --font-display: var(--font-display, "Bricolage Grotesque", -apple-system, BlinkMacSystemFont, sans-serif);
+  --font-body: var(--font-body, "DM Sans", -apple-system, BlinkMacSystemFont, sans-serif);
+  --font-mono: var(--font-mono, "DM Mono", ui-monospace, SFMono-Regular, monospace);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+  background-color: var(--canvas);
+}
+
+body {
+  font-family: var(--font-body);
+  background-color: var(--canvas);
+  color: var(--ink);
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Headings use Display font */
+h1, h2, h3, h4, h5, h6, .font-display {
+  font-family: var(--font-display);
+  letter-spacing: -0.02em;
+}
+
+/* Mono font utility */
+code, pre, .font-mono {
+  font-family: var(--font-mono);
+}
+
+/* Soft Lilac Ambient Shadows */
+.shadow-soft {
+  box-shadow: 0 12px 32px -12px rgba(143, 118, 217, 0.28);
+}
+
+.shadow-soft-sm {
+  box-shadow: 0 4px 16px -4px rgba(143, 118, 217, 0.16);
+}
+
+.shadow-soft-lg {
+  box-shadow: 0 20px 48px -12px rgba(143, 118, 217, 0.35);
+}
+
+.shadow-polaroid {
+  box-shadow: 0 10px 25px -5px rgba(43, 42, 58, 0.08), 0 8px 10px -6px rgba(143, 118, 217, 0.12);
+}
+
+/* Shutter Flash Animation */
+@keyframes shutter-flash {
+  0% { opacity: 0.9; }
+  100% { opacity: 0; }
+}
+
+.animate-shutter {
+  animation: shutter-flash 400ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Viewfinder Scan Line Animation */
+@keyframes scan-sweep {
+  0% { transform: translateY(-100%); opacity: 0.4; }
+  50% { opacity: 0.9; }
+  100% { transform: translateY(500%); opacity: 0.4; }
+}
+
+.animate-scan-line {
+  animation: scan-sweep 3s ease-in-out infinite;
+}
+
+/* Reduced Motion Overrides */
+@media (prefers-reduced-motion: reduce) {
+  .animate-shutter {
+    animation: none !important;
+    opacity: 0 !important;
+  }
+  .animate-scan-line {
+    animation: none !important;
+    display: none !important;
+  }
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Focus Ring */
+*:focus-visible {
+  outline: 2px solid var(--lilac-deep);
+  outline-offset: 2px;
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--surface-tint);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--lilac);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--lilac-deep);
+}
