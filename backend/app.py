@@ -169,7 +169,13 @@ model_manager = ModelManager()
 
 # Flask app
 app = Flask(__name__)
-CORS(app, resources={r"/api/*": {"origins": ["http://localhost:3000", "http://127.0.0.1:3000"]}})
+FRONTEND_URL = os.getenv("FRONTEND_URL", "*")
+if FRONTEND_URL == "*":
+    CORS(app, resources={r"/api/*": {"origins": "*"}})
+else:
+    allowed_origins = ["http://localhost:3000", "http://127.0.0.1:3000"]
+    allowed_origins.extend([o.strip() for o in FRONTEND_URL.split(",") if o.strip()])
+    CORS(app, resources={r"/api/*": {"origins": allowed_origins}})
 
 # Configure Flask app with database and model instances
 app.config["DB"] = db
