@@ -45,17 +45,29 @@ logger = logging.getLogger(__name__)
 
 load_dotenv()
 
-# MongoDB setup
-MONGODB_URI = os.getenv("MONGODB_URI", "mongodb://localhost:27017/")
+# Database setup: Connects to Supabase if credentials are provided, falls back to MongoDB
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY") or os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_ANON_KEY")
 DB_NAME = os.getenv("DATABASE_NAME", "facerecognition")
 COLLECTION_NAME = os.getenv("COLLECTION_NAME", "students")
 THRESHOLD = float(os.getenv("THRESHOLD", "0.6"))
 
-client = MongoClient(MONGODB_URI)
-db = client[DB_NAME]
-students_collection = db[COLLECTION_NAME]
-attendance_db = client["facerecognition_db"]
-attendance_collection = attendance_db["attendance_records"]
+if SUPABASE_URL and SUPABASE_KEY:
+    logger.info(f"⚡ Connecting to Supabase at {SUPABASE_URL}...")
+    from supabase_db import SupabaseDB
+    db = SupabaseDB(SUPABASE_URL, SUPABASE_KEY)
+    students_collection = db[COLLECTION_NAME]
+    attendance_collection = db["attendance_records"]
+    logger.info("✅ Connected to Supabase successfully")
+else:
+    logger.info("Connecting to MongoDB database...")
+    MONGODB_URI = os.getenv("MONGODB_URI", "mongodb://localhost:27017/")
+    client = MongoClient(MONGODB_URI)
+    db = client[DB_NAME]
+    students_collection = db[COLLECTION_NAME]
+    attendance_db = client["facerecognition_db"]
+    attendance_collection = attendance_db["attendance_records"]
+    logger.info("✅ Connected to MongoDB successfully")
 
 # OPTIMIZED MODEL MANAGER CLASS
 class ModelManager:
