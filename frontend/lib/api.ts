@@ -1,7 +1,15 @@
 /**
- * Typed API Client for SnapPresent
- * Handles authentication headers and contract validation against Flask backend
+ * Resolves backend base URL at runtime:
+ * - Server-side (functions/SSR): uses BACKEND_URL injected by Vercel service binding
+ * - Client-side (browser): uses NEXT_PUBLIC_API_URL if set, or empty string '' for same-origin Vercel rewrite
+ * - Fallback (local dev): http://localhost:5000
  */
+export function getApiBaseUrl(): string {
+  if (typeof window === 'undefined') {
+    return process.env.BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+  }
+  return process.env.NEXT_PUBLIC_API_URL || '';
+}
 
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 
@@ -215,7 +223,8 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
     reqHeaders['X-User-Type'] = userType;
   }
 
-  const url = endpoint.startsWith('http') ? endpoint : `${API_BASE_URL}${endpoint}`;
+  const base = getApiBaseUrl();
+  const url = endpoint.startsWith('http') ? endpoint : `${base}${endpoint}`;
 
   const response = await fetch(url, {
     method,
