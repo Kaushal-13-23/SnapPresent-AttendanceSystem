@@ -1,6 +1,7 @@
-numpy
-opencv-contrib-python
-opencv-python
+# Production Web Service Requirements
+-r backend/requirements.txt
+
+# Additional legacy utilities if run directly from root
 openpyxl
 pandas
 pillow

@@ -6,12 +6,12 @@
  */
 export function getApiBaseUrl(): string {
   if (typeof window === 'undefined') {
-    return process.env.BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+    return process.env.BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || 'https://snappresent-attendancesystem-l216.onrender.com';
   }
-  return process.env.NEXT_PUBLIC_API_URL || '';
+  return process.env.NEXT_PUBLIC_API_URL || 'https://snappresent-attendancesystem-l216.onrender.com';
 }
 
-export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://snappresent-attendancesystem-l216.onrender.com';
 
 export type UserType = 'student' | 'teacher';
 
