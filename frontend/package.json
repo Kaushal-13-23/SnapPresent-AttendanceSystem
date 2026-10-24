@@ -12,7 +12,7 @@
     "@vladmandic/face-api": "^1.7.15",
     "framer-motion": "^12.43.0",
     "lucide-react": "^0.544.0",
-    "next": "15.5.4",
+    "next": "15.5.28",
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "socket.io-client": "^4.8.1",
@@ -26,7 +26,7 @@
     "@types/react-dom": "^19",
     "@types/xlsx": "^0.0.35",
     "eslint": "^9",
-    "eslint-config-next": "15.5.4",
+    "eslint-config-next": "15.5.28",
     "tailwindcss": "^4",
     "typescript": "^5"
   }
