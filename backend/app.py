@@ -121,17 +121,21 @@ class ModelManager:
             with self._load_lock:
                 if not self.deepface_ready:
                     from deepface import DeepFace
-                    logger.info("Warming up DeepFace Facenet512 model...")
-                    dummy_img = np.zeros((160, 160, 3), dtype=np.uint8)
-                    _ = DeepFace.represent(
-                        dummy_img, 
-                        model_name='Facenet512', 
-                        detector_backend='skip',
-                        enforce_detection=False
-                    )
+                    logger.info("Building DeepFace Facenet512 model...")
+                    try:
+                        _ = DeepFace.build_model("Facenet512")
+                    except Exception as e:
+                        logger.warning(f"build_model fallback to represent: {e}")
+                        dummy_img = np.zeros((160, 160, 3), dtype=np.uint8)
+                        _ = DeepFace.represent(
+                            dummy_img, 
+                            model_name='Facenet512', 
+                            detector_backend='skip',
+                            enforce_detection=False
+                        )
                     self.deepface_ready = True
                     self.models_ready = True
-                    logger.info("✅ DeepFace Facenet512 model warmed up successfully")
+                    logger.info("✅ DeepFace Facenet512 model loaded successfully")
         return self.deepface_ready
 
     def get_detector(self):
