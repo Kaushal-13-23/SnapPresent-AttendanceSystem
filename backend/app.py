@@ -1,8 +1,18 @@
 # app.py - OPTIMIZED VERSION
 import os
+import sys
 import time
 import logging
 import threading
+
+# Ensure backend directory and current directory are always in sys.path
+backend_dir = os.path.dirname(os.path.abspath(__file__))
+if backend_dir not in sys.path:
+    sys.path.insert(0, backend_dir)
+parent_dir = os.path.dirname(backend_dir)
+if parent_dir not in sys.path:
+    sys.path.insert(1, parent_dir)
+
 from flask import Flask
 from flask_cors import CORS
 from pymongo import MongoClient
@@ -10,38 +20,60 @@ from dotenv import load_dotenv
 from flask_bcrypt import Bcrypt
 import numpy as np
 
-# Blueprint imports
-from auth.routes import auth_bp
-
-# Optional student/teacher blueprints
-try:
-    from student.registration import student_registration_bp
-except ImportError:
-    student_registration_bp = None
-
-try:
-    from student.updatedetails import student_update_bp
-except ImportError:
-    student_update_bp = None
-
-try:
-    from student.demo_session import demo_session_bp
-except ImportError:
-    demo_session_bp = None
-
-try:
-    from student.view_attendance import attendance_bp
-except ImportError:
-    attendance_bp = None
-
-try:
-    from teacher.attendance_records import attendance_session_bp
-except ImportError:
-    attendance_session_bp = None
-
 # Logging setup
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
+
+# Blueprint imports with robust root/subfolder resolution
+try:
+    from auth.routes import auth_bp
+except ImportError:
+    from backend.auth.routes import auth_bp
+
+try:
+    from student.registration import student_registration_bp
+except Exception as e:
+    try:
+        from backend.student.registration import student_registration_bp
+    except Exception as e2:
+        logger.error(f"❌ Failed to import student_registration_bp: {e2}")
+        student_registration_bp = None
+
+try:
+    from student.updatedetails import student_update_bp
+except Exception as e:
+    try:
+        from backend.student.updatedetails import student_update_bp
+    except Exception as e2:
+        logger.error(f"❌ Failed to import student_update_bp: {e2}")
+        student_update_bp = None
+
+try:
+    from student.demo_session import demo_session_bp
+except Exception as e:
+    try:
+        from backend.student.demo_session import demo_session_bp
+    except Exception as e2:
+        logger.error(f"❌ Failed to import demo_session_bp: {e2}")
+        demo_session_bp = None
+
+try:
+    from student.view_attendance import attendance_bp
+except Exception as e:
+    try:
+        from backend.student.view_attendance import attendance_bp
+    except Exception as e2:
+        logger.error(f"❌ Failed to import attendance_bp: {e2}")
+        attendance_bp = None
+
+try:
+    from teacher.attendance_records import attendance_session_bp
+except Exception as e:
+    try:
+        from backend.teacher.attendance_records import attendance_session_bp
+    except Exception as e2:
+        logger.error(f"❌ Failed to import attendance_session_bp: {e2}")
+        attendance_session_bp = None
 
 load_dotenv()
 
