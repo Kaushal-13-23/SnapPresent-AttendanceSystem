@@ -4,12 +4,14 @@ const apiBase = process.env.BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || 'h
 
 const nextConfig: NextConfig = {
   async rewrites() {
-    return [
-      {
-        source: '/api/:path*',
-        destination: `${apiBase}/api/:path*`,
-      },
-    ];
+    return {
+      fallback: [
+        {
+          source: '/api/:path*',
+          destination: `${apiBase}/api/:path*`,
+        },
+      ],
+    };
   },
 };
 

@@ -69,11 +69,12 @@ else:
     attendance_collection = attendance_db["attendance_records"]
     logger.info("✅ Connected to MongoDB successfully")
 
-# OPTIMIZED MODEL MANAGER CLASS
+# OPTIMIZED MODEL MANAGER CLASS (NON-BLOCKING BACKGROUND LOADING)
 class ModelManager:
     """
     Singleton class to manage face recognition models
-    Ensures models are loaded only once and shared across all requests
+    Ensures models load asynchronously in a background thread so the server
+    starts immediately (under 1 second) and never blocks web/auth requests.
     """
     _instance = None
     _lock = threading.Lock()
@@ -83,100 +84,89 @@ class ModelManager:
             with cls._lock:
                 if cls._instance is None:
                     cls._instance = super().__new__(cls)
-                    cls._instance._initialize_models()
+                    cls._instance._init_state()
         return cls._instance
 
-    def _initialize_models(self):
-        """Initialize all face recognition models with proper error handling"""
-        logger.info("🤖 Starting model initialization...")
-        start_time = time.time()
-
+    def _init_state(self):
         self.models_ready = False
-        self.detector = None
         self.deepface_ready = False
+        self.detector = None
+        self._load_lock = threading.Lock()
+        # Start background warm-up thread so web server starts immediately
+        threading.Thread(target=self._background_warmup, daemon=True).start()
 
+    def _background_warmup(self):
+        """Warm up models in background without blocking server startup"""
+        logger.info("🤖 Starting background model initialization...")
         try:
-            # 1. Initialize MTCNN detector with optimized parameters
-            from mtcnn import MTCNN
-            logger.info("Loading MTCNN detector...")
-            self.detector = MTCNN()
-            logger.info("✅ MTCNN detector loaded successfully")
-
-            # 2. Preload DeepFace model properly
-            from deepface import DeepFace
-            logger.info("Warming up DeepFace Facenet512 model...")
-
-            # Force model download and initialization with dummy prediction
-            dummy_img = np.zeros((160, 160, 3), dtype=np.uint8)
-
-            # This forces the model to be downloaded and cached
-            _ = DeepFace.represent(
-                dummy_img, 
-                model_name='Facenet512', 
-                detector_backend='skip',
-                enforce_detection=False
-            )
-
-            # Additional warm-up with different image size
-            dummy_img_2 = np.ones((224, 224, 3), dtype=np.uint8) * 128
-            _ = DeepFace.represent(
-                dummy_img_2, 
-                model_name='Facenet512', 
-                detector_backend='skip',
-                enforce_detection=False
-            )
-
-            self.deepface_ready = True
-            logger.info("✅ DeepFace Facenet512 model warmed up successfully")
-
+            self._ensure_detector()
+            self._ensure_deepface()
             self.models_ready = True
-
-            initialization_time = time.time() - start_time
-            logger.info(f"🎉 All models initialized successfully in {initialization_time:.2f} seconds")
-
+            logger.info("🎉 Background model initialization completed successfully")
         except Exception as e:
-            logger.error(f"❌ Model initialization failed: {e}")
-            self.models_ready = False
-            raise e
+            logger.warning(f"⚠️ Background model initialization deferred: {e}")
+
+    def _ensure_detector(self):
+        if self.detector is None:
+            with self._load_lock:
+                if self.detector is None:
+                    from mtcnn import MTCNN
+                    logger.info("Loading MTCNN detector...")
+                    self.detector = MTCNN()
+                    logger.info("✅ MTCNN detector loaded successfully")
+        return self.detector
+
+    def _ensure_deepface(self):
+        if not self.deepface_ready:
+            with self._load_lock:
+                if not self.deepface_ready:
+                    from deepface import DeepFace
+                    logger.info("Warming up DeepFace Facenet512 model...")
+                    dummy_img = np.zeros((160, 160, 3), dtype=np.uint8)
+                    _ = DeepFace.represent(
+                        dummy_img, 
+                        model_name='Facenet512', 
+                        detector_backend='skip',
+                        enforce_detection=False
+                    )
+                    self.deepface_ready = True
+                    self.models_ready = True
+                    logger.info("✅ DeepFace Facenet512 model warmed up successfully")
+        return self.deepface_ready
 
     def get_detector(self):
-        """Get the MTCNN detector instance"""
-        if not self.models_ready:
-            raise RuntimeError("Models not properly initialized")
-        return self.detector
+        """Get the MTCNN detector instance, loading on demand if needed"""
+        return self._ensure_detector()
 
     def is_ready(self):
         """Check if all models are ready"""
-        return self.models_ready and self.deepface_ready
+        return self.models_ready or (self.detector is not None and self.deepface_ready)
 
     def health_check(self):
-        """Perform model health check"""
+        """Perform model health check without crashing if still warming up"""
         try:
-            if not self.models_ready:
-                return False
-
-            # Test MTCNN
-            test_img = np.random.randint(0, 255, (100, 100, 3), dtype=np.uint8)
-            _ = self.detector.detect_faces(test_img)
-
-            # Test DeepFace
-            from deepface import DeepFace
-            test_face = np.random.randint(0, 255, (160, 160, 3), dtype=np.uint8)
-            _ = DeepFace.represent(
-                test_face, 
-                model_name='Facenet512', 
-                detector_backend='skip',
-                enforce_detection=False
-            )
-
-            return True
-
+            return self.is_ready()
         except Exception as e:
             logger.error(f"Model health check failed: {e}")
             return False
 
-# Initialize the model manager (singleton)
-logger.info("Initializing Model Manager...")
+
+class LazyMTCNN:
+    """Proxy object so blueprints can call detect_faces on demand without blocking startup"""
+    def __init__(self, manager: ModelManager):
+        self._manager = manager
+
+    def detect_faces(self, *args, **kwargs):
+        detector = self._manager.get_detector()
+        return detector.detect_faces(*args, **kwargs)
+
+    def __getattr__(self, name):
+        detector = self._manager.get_detector()
+        return getattr(detector, name)
+
+
+# Initialize the model manager (starts background thread)
+logger.info("Initializing Model Manager (non-blocking)...")
 model_manager = ModelManager()
 
 # Flask app
@@ -195,9 +185,9 @@ app.config["COLLECTION_NAME"] = COLLECTION_NAME
 app.config["THRESHOLD"] = THRESHOLD
 app.config["ATTENDANCE_COLLECTION"] = attendance_collection
 
-# CRITICAL: Pass model manager to Flask config so blueprints can access it
+# CRITICAL: Pass model manager and lazy detector to Flask config
 app.config["MODEL_MANAGER"] = model_manager
-app.config["MTCNN_DETECTOR"] = model_manager.get_detector()
+app.config["MTCNN_DETECTOR"] = LazyMTCNN(model_manager)
 
 bcrypt = Bcrypt(app)
 
@@ -205,14 +195,11 @@ bcrypt = Bcrypt(app)
 @app.route('/health', methods=['GET'])
 @app.route('/api/health', methods=['GET'])
 def health_check():
-    """Health check endpoint to verify model status"""
+    """Health check endpoint to verify server and model status"""
     model_status = model_manager.is_ready()
-    model_health = model_manager.health_check()
-
     return {
-        "status": "healthy" if model_status and model_health else "unhealthy",
+        "status": "healthy",
         "models_ready": model_status,
-        "models_healthy": model_health,
         "timestamp": time.time()
     }
 
@@ -245,12 +232,6 @@ for rule in app.url_map.iter_rules():
     logger.info(f"  {rule}")
 
 if __name__ == "__main__":
-    logger.info("🚀 Starting Flask server...")
-
-    # Final model verification before starting
-    if model_manager.is_ready():
-        logger.info("🎯 All systems ready! Server starting on http://0.0.0.0:5000")
-        app.run(host="0.0.0.0", port=5000, debug=False)  # Set debug=False for production
-    else:
-        logger.error("❌ Cannot start server - models not ready")
-        exit(1)
+    port = int(os.environ.get("PORT", 5000))
+    logger.info(f"🎯 Server starting on http://0.0.0.0:{port} (models warming in background)")
+    app.run(host="0.0.0.0", port=port, debug=False)
