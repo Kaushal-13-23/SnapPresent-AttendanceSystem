@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 const BACKEND_URL =
   process.env.BACKEND_URL ||
   process.env.NEXT_PUBLIC_API_URL ||
-  'https://snappresent-attendancesystem-l216.onrender.com';
+  'https://snappresent-backend.onrender.com';
 
 export async function POST(request: Request) {
   try {
