@@ -176,10 +176,22 @@ def find_best_match_optimized_attendance(query_embedding, students_col, session_
 
 # ----------------- OPTIMIZED Routes ----------------- #
 
+def find_session_by_id(collection, session_id):
+    clean_id = str(session_id)
+    doc = collection.find_one({"id": clean_id})
+    if not doc:
+        doc = collection.find_one({"_id": clean_id})
+    if not doc:
+        try:
+            doc = collection.find_one({"_id": ObjectId(clean_id)})
+        except Exception:
+            pass
+    return doc
+
 @attendance_session_bp.route("/create_session", methods=["POST"])
 def create_session():
     """Create a new attendance session"""
-    data = request.json
+    data = request.json or {}
     db = current_app.config.get("DB")
     students_col = db.students
 
@@ -190,11 +202,13 @@ def create_session():
         "department": data.get("department"),
         "year": data.get("year"),
         "division": data.get("division"),
-        "created_at": datetime.now(),
+        "created_at": datetime.now().isoformat(),
         "finalized": False,
         "ended_at": None,
         "students": []
     }
+    if data.get("session_id"):
+        session_doc["id"] = str(data["session_id"])
 
     # Prepopulate session with all students in that class
     student_filter = {}
@@ -227,7 +241,7 @@ def create_session():
 @attendance_session_bp.route("/end_session", methods=["POST"])
 def end_session():
     """Finalize an attendance session with enhanced logging"""
-    data = request.get_json()
+    data = request.get_json() or {}
     session_id = data.get("session_id")
     if not session_id:
         return jsonify({"error": "Missing session_id"}), 400
@@ -237,7 +251,7 @@ def end_session():
         db = current_app.config.get("DB")
         students_col = db.students
 
-        session_doc = collection.find_one({"_id": ObjectId(session_id)})
+        session_doc = find_session_by_id(collection, session_id)
         if not session_doc:
             return jsonify({"error": "Session not found"}), 404
 
@@ -333,7 +347,7 @@ def mark_attendance_with_duplicate_prevention():
 
         # Validate session
         collection = get_attendance_collection()
-        session_doc = collection.find_one({"_id": ObjectId(session_id)})
+        session_doc = find_session_by_id(collection, session_id)
         if not session_doc:
             return jsonify({"error": "Session not found"}), 404
         if session_doc.get("finalized"):

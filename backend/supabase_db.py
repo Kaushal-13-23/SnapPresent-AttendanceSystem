@@ -171,6 +171,18 @@ class SupabaseCollection:
             print(f"[SupabaseCollection.find] {self.table_name} error: {e}")
             return SupabaseCursor([])
 
+def _clean_for_json(val):
+    if isinstance(val, dict):
+        return {k: _clean_for_json(v) for k, v in val.items()}
+    elif isinstance(val, list):
+        return [_clean_for_json(item) for item in val]
+    elif isinstance(val, datetime):
+        return val.isoformat()
+    elif hasattr(val, '__str__') and type(val).__name__ == 'ObjectId':
+        return str(val)
+    return val
+
+
     def insert_one(self, document: dict):
         doc = dict(document)
         # Ensure ID exists
@@ -180,6 +192,7 @@ class SupabaseCollection:
             doc["id"] = uuid.uuid4().hex[:24]
 
         inserted_id = doc["id"]
+        doc = _clean_for_json(doc)
 
         try:
             res = self.client.table(self.table_name).insert(doc).execute()
