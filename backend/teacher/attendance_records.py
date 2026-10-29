@@ -381,23 +381,40 @@ def mark_attendance_with_duplicate_prevention():
                 })
                 continue
 
-            # EXACT SAME MATCHING LOGIC AS DEMO SESSION
+            # Comprehensive multi-angle matching (checks all 5 stored polaroid angles + mean)
             best, min_d = None, float("inf")
             for student in students:
                 stored_embeddings = student.get("embeddings", [])
                 if not stored_embeddings:
                     continue
                 
-                # Average multiple embeddings
-                if isinstance(stored_embeddings, list) and len(stored_embeddings) > 0:
-                    avg_embedding = np.mean(stored_embeddings, axis=0)
+                candidate_dists = []
+                if isinstance(stored_embeddings, list):
+                    for e in stored_embeddings:
+                        try:
+                            arr = np.array(e, dtype=np.float32)
+                            candidate_dists.append(cosine(emb, arr))
+                        except Exception:
+                            pass
+                    
+                    if len(stored_embeddings) > 1:
+                        try:
+                            avg_arr = np.mean(stored_embeddings, axis=0)
+                            candidate_dists.append(cosine(emb, avg_arr))
+                        except Exception:
+                            pass
                 else:
-                    avg_embedding = np.array(stored_embeddings)
+                    try:
+                        arr = np.array(stored_embeddings, dtype=np.float32)
+                        candidate_dists.append(cosine(emb, arr))
+                    except Exception:
+                        pass
                 
-                d = cosine(emb, avg_embedding)
-                if d < min_d:
-                    min_d = d
-                    best = student
+                if candidate_dists:
+                    s_min = min(candidate_dists)
+                    if s_min < min_d:
+                        min_d = s_min
+                        best = student
 
             if min_d < threshold and best:
                 student_id = best.get("studentId")
@@ -419,14 +436,23 @@ def mark_attendance_with_duplicate_prevention():
                     continue
 
                 # MARK ATTENDANCE (Student not yet marked)
+                clean_session_id = str(session_id)
+                now_str = datetime.now().isoformat()
+
                 updated = collection.update_one(
-                    {"_id": ObjectId(session_id), "students.student_id": student_id, "students.present": False},
-                    {"$set": {"students.$.present": True, "students.$.marked_at": datetime.now()}}
+                    {"id": clean_session_id, "students.student_id": student_id},
+                    {"$set": {"students.$.present": True, "students.$.marked_at": now_str}}
                 )
 
-                if updated.matched_count > 0 and updated.modified_count > 0:
+                if updated.matched_count == 0:
+                    updated = collection.update_one(
+                        {"_id": clean_session_id, "students.student_id": student_id},
+                        {"$set": {"students.$.present": True, "students.$.marked_at": now_str}}
+                    )
+
+                if updated.matched_count > 0:
                     # Successfully marked present
-                    already_present_students.add(student_id)  # Update our local set
+                    already_present_students.add(student_id)
                     results.append({
                         "match": {"user_id": student_id, "name": student_name},
                         "distance": round(float(min_d), 4),
@@ -436,22 +462,22 @@ def mark_attendance_with_duplicate_prevention():
                         "status": "marked_present",
                         "message": f"{student_name} marked present successfully"
                     })
-                    logger.info(f"✅ Marked {student_name} ({student_id}) as present")
+                    logger.info(f"✅ Marked {student_name} ({student_id}) as present (dist: {min_d:.3f})")
                 
                 else:
-                    # Student entry doesn't exist, create new one
+                    # Student entry doesn't exist, append new present entry
                     collection.update_one(
-                        {"_id": ObjectId(session_id)},
+                        {"id": clean_session_id},
                         {"$push": {
                             "students": {
                                 "student_id": student_id,
                                 "student_name": student_name,
                                 "present": True,
-                                "marked_at": datetime.now()
+                                "marked_at": now_str
                             }
                         }}
                     )
-                    already_present_students.add(student_id)  # Update our local set
+                    already_present_students.add(student_id)
                     results.append({
                         "match": {"user_id": student_id, "name": student_name},
                         "distance": round(float(min_d), 4),
@@ -461,7 +487,7 @@ def mark_attendance_with_duplicate_prevention():
                         "status": "marked_present_new",
                         "message": f"{student_name} added to session and marked present"
                     })
-                    logger.info(f"✅ Added {student_name} ({student_id}) to session as present")
+                    logger.info(f"✅ Added {student_name} ({student_id}) to session as present (dist: {min_d:.3f})")
 
             else:
                 # No match found

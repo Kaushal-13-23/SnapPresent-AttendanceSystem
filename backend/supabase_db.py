@@ -36,6 +36,17 @@ class SupabaseCursor(list):
         except Exception:
             return self
 
+def _clean_for_json(val):
+    if isinstance(val, dict):
+        return {k: _clean_for_json(v) for k, v in val.items()}
+    elif isinstance(val, list):
+        return [_clean_for_json(item) for item in val]
+    elif isinstance(val, datetime):
+        return val.isoformat()
+    elif hasattr(val, '__str__') and type(val).__name__ == 'ObjectId':
+        return str(val)
+    return val
+
 
 class SupabaseCollection:
     def __init__(self, client: Client, table_name: str):
@@ -170,18 +181,6 @@ class SupabaseCollection:
         except Exception as e:
             print(f"[SupabaseCollection.find] {self.table_name} error: {e}")
             return SupabaseCursor([])
-
-def _clean_for_json(val):
-    if isinstance(val, dict):
-        return {k: _clean_for_json(v) for k, v in val.items()}
-    elif isinstance(val, list):
-        return [_clean_for_json(item) for item in val]
-    elif isinstance(val, datetime):
-        return val.isoformat()
-    elif hasattr(val, '__str__') and type(val).__name__ == 'ObjectId':
-        return str(val)
-    return val
-
 
     def insert_one(self, document: dict):
         doc = dict(document)
