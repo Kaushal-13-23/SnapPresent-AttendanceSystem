@@ -72,6 +72,37 @@ export default function FacultyLiveSessionPage() {
     setTimeout(() => setShutterTrigger(false), 380);
   }, []);
 
+  // Live Scanner Feedback State
+  const [scannerStatus, setScannerStatus] = useState<{
+    text: string;
+    type: 'idle' | 'scanning' | 'matched' | 'unrecognized' | 'warming';
+  }>({ text: 'Scanner active. Align face in viewfinder.', type: 'scanning' });
+
+  // Rate-limit alerts so they don't spam every 2 seconds
+  const lastAlertTimeRef = useRef<{ [key: string]: number }>({});
+
+  // Audio chime feedback for marked attendance
+  const playAttendanceChime = useCallback(() => {
+    try {
+      const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(587.33, ctx.currentTime); // D5
+      osc.frequency.setValueAtTime(880, ctx.currentTime + 0.08); // A5
+      gain.gain.setValueAtTime(0.15, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.35);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.35);
+    } catch {
+      // Audio autoplay might be restricted before interaction
+    }
+  }, []);
+
   // Step 1: Initialize session on backend
   const handleStartSession = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -97,13 +128,14 @@ export default function FacultyLiveSessionPage() {
       setTotalPresentNow(0);
       setDuplicatesPrevented(0);
       setIsPaused(false);
+      setScannerStatus({ text: 'Session active. Ready for student faces.', type: 'scanning' });
 
       success(
         `Session initiated for ${subject} (${department} - ${year} Div ${division}). Preloaded ${res.students_count} roster students.`,
         'Session Active'
       );
 
-      // Start 2s live sampling
+      // Start live sampling
       startScanning(res.session_id);
     } catch (err: unknown) {
       const msg = (err as Error)?.message || 'Failed to start live session';
@@ -121,6 +153,20 @@ export default function FacultyLiveSessionPage() {
 
         try {
           const res = await api.realMarkAttendance(currentSessionId, base64Frame);
+          const now = Date.now();
+
+          // Check if AI backend reported warming up
+          if (res?.message && (res.message.toLowerCase().includes('warming') || res.message.toLowerCase().includes('initializing'))) {
+            setScannerStatus({
+              text: 'AI engine connecting / warming up... Please hold steady in frame.',
+              type: 'warming',
+            });
+            if (now - (lastAlertTimeRef.current['warming'] || 0) > 15000) {
+              info('AI models are warming up on backend. Hold steady.', 'AI Initializing');
+              lastAlertTimeRef.current['warming'] = now;
+            }
+            return;
+          }
 
           if (res?.session_info) {
             setTotalPresentNow(res.session_info.total_present_now);
@@ -131,47 +177,99 @@ export default function FacultyLiveSessionPage() {
             }
           }
 
-          // Process recognized faces
-          if (res?.faces && res.faces.length > 0) {
-            res.faces.forEach((face) => {
-              if (face.match) {
-                const nowTime = new Date().toLocaleTimeString([], {
-                  hour: '2-digit',
-                  minute: '2-digit',
-                  second: '2-digit',
-                });
-
-                const eventItem: RecognizedEvent = {
-                  id: `${face.match.user_id}-${Date.now()}-${Math.random()}`,
-                  studentId: face.match.user_id,
-                  name: face.match.name,
-                  confidence: face.confidence ?? 95.0,
-                  timestamp: nowTime,
-                  alreadyMarked: !!face.already_marked,
-                  status: (face.status as RecognizedEvent['status']) || 'marked_present',
-                  thumbnail: base64Frame,
-                };
-
-                // Trigger shutter flash
-                triggerShutterFlash();
-
-                setMatchedFeed((prev) => {
-                  // Prevent immediate visual spam of duplicate cards
-                  const recentSame = prev.slice(0, 3).find((p) => p.studentId === face.match?.user_id);
-                  if (recentSame && face.already_marked) {
-                    return prev;
-                  }
-                  return [eventItem, ...prev].slice(0, 25);
-                });
-              }
+          // Case 1: No faces detected in frame
+          if (!res?.faces || res.faces.length === 0) {
+            setScannerStatus({
+              text: 'Looking for faces... Please face the camera with good lighting.',
+              type: 'scanning',
             });
+            return;
           }
+
+          // Case 2: Faces detected
+          let anyMatchedInThisFrame = false;
+
+          res.faces.forEach((face) => {
+            if (face.match) {
+              anyMatchedInThisFrame = true;
+              const nowTime = new Date().toLocaleTimeString([], {
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+              });
+
+              const isDuplicate = !!face.already_marked || face.status === 'duplicate';
+
+              const eventItem: RecognizedEvent = {
+                id: `${face.match.user_id}-${Date.now()}-${Math.random()}`,
+                studentId: face.match.user_id,
+                name: face.match.name,
+                confidence: face.confidence ?? 95.0,
+                timestamp: nowTime,
+                alreadyMarked: isDuplicate,
+                status: (face.status as RecognizedEvent['status']) || 'marked_present',
+                thumbnail: base64Frame,
+              };
+
+              // Trigger shutter flash & chime
+              triggerShutterFlash();
+              if (!isDuplicate) {
+                playAttendanceChime();
+              }
+
+              // Update HUD Status Banner
+              setScannerStatus({
+                text: isDuplicate
+                  ? `ℹ️ Already Marked: ${face.match.name} (${face.match.user_id})`
+                  : `✅ Verified: ${face.match.name} (${face.match.user_id}) - ${face.confidence?.toFixed(1) ?? '95'}% match`,
+                type: 'matched',
+              });
+
+              // Trigger Alert Toast
+              const lastStudentAlert = lastAlertTimeRef.current[face.match.user_id] || 0;
+              if (now - lastStudentAlert > 8000) {
+                if (isDuplicate) {
+                  info(`${face.match.name} is already marked present in this session.`, 'Already Present');
+                } else {
+                  success(`✅ ${face.match.name} (${face.match.user_id}) marked PRESENT!`, 'Attendance Recorded');
+                }
+                lastAlertTimeRef.current[face.match.user_id] = now;
+              }
+
+              setMatchedFeed((prev) => {
+                const recentSame = prev.slice(0, 3).find((p) => p.studentId === face.match?.user_id);
+                if (recentSame && isDuplicate) {
+                  return prev;
+                }
+                return [eventItem, ...prev].slice(0, 25);
+              });
+            } else {
+              // Face detected, but not matched with roster
+              if (!anyMatchedInThisFrame) {
+                const distText = face.distance ? ` [dist: ${face.distance.toFixed(2)}]` : '';
+                setScannerStatus({
+                  text: `⚠️ Face detected, but not recognized in class roster${distText}.`,
+                  type: 'unrecognized',
+                });
+
+                const lastUnrecAlert = lastAlertTimeRef.current['unrecognized'] || 0;
+                if (now - lastUnrecAlert > 7000) {
+                  error('Face detected, but does not match any enrolled student in roster.', 'Unrecognized Face');
+                  lastAlertTimeRef.current['unrecognized'] = now;
+                }
+              }
+            }
+          });
         } catch (err) {
           console.error('Frame mark error:', err);
+          setScannerStatus({
+            text: 'Scanning connection paused, retrying next frame...',
+            type: 'scanning',
+          });
         }
       });
     },
-    [isPaused, triggerShutterFlash]
+    [isPaused, triggerShutterFlash, playAttendanceChime, success, error, info]
   );
 
   // Pause / Resume Scanning
@@ -390,6 +488,43 @@ export default function FacultyLiveSessionPage() {
                 title={`${subject} &bull; Div ${division}`}
                 badge={isPaused ? 'Scanning Paused' : 'Live Sweeping (~2s)'}
               />
+            </div>
+
+            {/* Live AI Scanner Status Feedback HUD */}
+            <div className={`p-3.5 rounded-2xl border transition-all flex items-center justify-between gap-3 shadow-soft-sm ${
+              scannerStatus.type === 'matched'
+                ? 'bg-[#E8F8F0] border-[#BDEBD6] text-[#1F6B50]'
+                : scannerStatus.type === 'unrecognized'
+                ? 'bg-[#FFF0F3] border-[#FFC8D6] text-[#8C2F4B]'
+                : scannerStatus.type === 'warming'
+                ? 'bg-[#EFF6FF] border-[#BFDBFE] text-[#1E40AF]'
+                : 'bg-white border-[#E7E0F5] text-[#2B2A3A]'
+            }`}>
+              <div className="flex items-center gap-2.5 min-w-0">
+                <span className={`w-3 h-3 rounded-full shrink-0 ${
+                  scannerStatus.type === 'matched'
+                    ? 'bg-[#2E9E74] ring-4 ring-[#BDEBD6] animate-pulse'
+                    : scannerStatus.type === 'unrecognized'
+                    ? 'bg-[#D64567] ring-4 ring-[#FFC8D6] animate-pulse'
+                    : scannerStatus.type === 'warming'
+                    ? 'bg-[#3B82F6] ring-4 ring-[#BFDBFE] animate-pulse'
+                    : 'bg-[#8F76D9] ring-4 ring-[#E7E0F5] animate-pulse'
+                }`} />
+                <span className="text-xs font-mono font-semibold truncate">
+                  {scannerStatus.text}
+                </span>
+              </div>
+              <span className={`text-[10px] font-mono uppercase tracking-wider px-2.5 py-0.5 rounded-full shrink-0 font-bold ${
+                scannerStatus.type === 'matched'
+                  ? 'bg-[#BDEBD6] text-[#1F6B50]'
+                  : scannerStatus.type === 'unrecognized'
+                  ? 'bg-[#FFC8D6] text-[#8C2F4B]'
+                  : scannerStatus.type === 'warming'
+                  ? 'bg-[#BFDBFE] text-[#1E40AF]'
+                  : 'bg-[#F4EFFF] text-[#8F76D9]'
+              }`}>
+                {scannerStatus.type === 'matched' ? 'VERIFIED' : scannerStatus.type === 'unrecognized' ? 'NO MATCH' : scannerStatus.type === 'warming' ? 'CONNECTING' : 'SCANNING'}
+              </span>
             </div>
 
             {/* Live Counters Banner */}
