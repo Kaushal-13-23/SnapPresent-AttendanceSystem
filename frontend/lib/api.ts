@@ -6,13 +6,13 @@
  */
 export function getApiBaseUrl(): string {
   if (typeof window === 'undefined') {
-    return process.env.BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || 'https://snappresent-backend.onrender.com';
+    return process.env.BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || 'https://snappresent-attendancesystem-production.up.railway.app';
   }
   // Client-side: use same-origin relative URL so Vercel handles auth and routes instantly
   return process.env.NEXT_PUBLIC_CLIENT_API_URL || '';
 }
 
-export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://snappresent-backend.onrender.com';
+export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://snappresent-attendancesystem-production.up.railway.app';
 
 export type UserType = 'student' | 'teacher';
 

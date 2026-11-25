@@ -27,8 +27,8 @@ RUN mkdir -p /root/.deepface/weights && \
 # Copy application source
 COPY . .
 
-# Expose default port
-EXPOSE 5000
+# Expose ports (both 5000 and 8080 supported)
+EXPOSE 5000 8080
 
-# Start Gunicorn server with dynamic $PORT injected by Railway
-CMD ["sh", "-c", "gunicorn --bind 0.0.0.0:${PORT:-5000} --workers 1 --threads 4 --timeout 180 --chdir backend app:app"]
+# Start Gunicorn server bound to both Port 5000 & 8080 (and dynamic $PORT)
+CMD ["python", "run_server.py"]
