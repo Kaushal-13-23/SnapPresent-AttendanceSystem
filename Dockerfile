@@ -1,7 +1,8 @@
 FROM python:3.11-slim
 
 ENV DEBIAN_FRONTEND=noninteractive \
-    PYTHONUNBUFFERED=1
+    PYTHONUNBUFFERED=1 \
+    PORT=5000
 
 # Install system dependencies for OpenCV, Pillow, and DeepFace
 RUN apt-get update && apt-get install -y --no-install-recommends \

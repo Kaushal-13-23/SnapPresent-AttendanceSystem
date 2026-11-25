@@ -78,11 +78,16 @@ except Exception as e:
 load_dotenv()
 
 # Database setup: Connects to Supabase if credentials are provided, falls back to MongoDB
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_KEY") or os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_ANON_KEY")
+SUPABASE_URL = os.getenv("SUPABASE_URL") or "https://zyxquwpfoqgzksnflxyj.supabase.co"
+SUPABASE_KEY = (
+    os.getenv("SUPABASE_KEY")
+    or os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+    or os.getenv("SUPABASE_ANON_KEY")
+    or "sb_publishable_LLxyULXMXTvojtwfw9WP4w_tZbv67va"
+)
 DB_NAME = os.getenv("DATABASE_NAME", "facerecognition")
 COLLECTION_NAME = os.getenv("COLLECTION_NAME", "students")
-THRESHOLD = float(os.getenv("THRESHOLD", "0.6"))
+THRESHOLD = float(os.getenv("THRESHOLD", "0.65"))
 
 if SUPABASE_URL and SUPABASE_KEY:
     logger.info(f"⚡ Connecting to Supabase at {SUPABASE_URL}...")
