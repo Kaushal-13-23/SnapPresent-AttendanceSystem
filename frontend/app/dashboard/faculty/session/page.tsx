@@ -17,6 +17,7 @@ import {
   Layers,
   ArrowRight,
   FileSpreadsheet,
+  ExternalLink,
 } from 'lucide-react';
 import { WebcamCapture, WebcamCaptureHandle } from '@/components/WebcamCapture';
 import { StatusStamp } from '@/components/StatusStamp';
@@ -325,7 +326,19 @@ export default function FacultyLiveSessionPage() {
         </div>
 
         {sessionActive && (
-          <div className="flex items-center gap-2.5">
+          <div className="flex flex-wrap items-center gap-2.5">
+            <a
+              href="https://docs.google.com/spreadsheets/d/1BKAkxy-3k-08gQ6jKjunmCmE45YwoXmIRax5RpVnzGc/edit?usp=sharing"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-2xl bg-[#E8F8F0] hover:bg-[#BDEBD6] border border-[#BDEBD6] text-[#1F6B50] font-semibold text-xs shadow-soft-sm transition-all"
+              title="Open Live Google Sheet (Main tab) to view or edit"
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5 text-[#1F6B50]" />
+              <span>Live Sheet (Main)</span>
+              <ExternalLink className="w-3 h-3 opacity-60" />
+            </a>
+
             <button
               type="button"
               onClick={handleTogglePause}

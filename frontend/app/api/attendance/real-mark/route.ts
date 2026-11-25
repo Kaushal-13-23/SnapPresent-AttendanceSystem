@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabaseServer } from '@/lib/supabase-server';
+import { syncToGoogleSheets, SheetAttendanceRow } from '@/lib/google-sheets';
 
 const BACKEND_URL = (
   process.env.BACKEND_URL ||
@@ -63,7 +64,7 @@ export async function POST(request: Request) {
         try {
           const { data: sessionDoc } = await supabaseServer
             .from('attendance_records')
-            .select('students')
+            .select('date, subject, department, year, division, students')
             .eq('id', sessionId)
             .maybeSingle();
 
@@ -101,9 +102,27 @@ export async function POST(request: Request) {
               .from('attendance_records')
               .update({ students: updatedStudents })
               .eq('id', sessionId);
+
+            // 24/7 Real-Time Live Sync to Google Sheets ("Main" Tab)
+            const sheetRows: SheetAttendanceRow[] = newlyMarked.map(
+              (f: { match: { user_id: string; name: string }; confidence?: number }) => ({
+                date: sessionDoc.date || new Date().toISOString().split('T')[0],
+                time: new Date().toLocaleTimeString(),
+                studentId: f.match.user_id,
+                studentName: f.match.name,
+                department: sessionDoc.department || 'General',
+                year: sessionDoc.year || '',
+                division: sessionDoc.division || '',
+                subject: sessionDoc.subject || 'Lecture',
+                status: 'Present',
+                verificationType: 'AI Facial Recognition',
+                confidence: f.confidence ?? 95,
+              })
+            );
+            syncToGoogleSheets(sheetRows).catch(() => {});
           }
         } catch (syncErr) {
-          console.error('Error syncing marked faces to Supabase:', syncErr);
+          console.error('Error syncing marked faces to Supabase/Sheets:', syncErr);
         }
       }
     }
