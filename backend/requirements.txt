@@ -12,3 +12,4 @@ tensorflow>=2.16.0,<2.19.0
 tf-keras>=2.16.0
 gunicorn
 supabase
+pillow

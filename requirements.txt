@@ -1,8 +1,15 @@
-# Production Web Service Requirements
--r backend/requirements.txt
-
-# Additional legacy utilities if run directly from root
-openpyxl
-pandas
+flask
+flask-cors
+pymongo
+deepface
+mtcnn
+numpy
+opencv-python-headless
+scipy
+python-dotenv
+flask-bcrypt
+tensorflow>=2.16.0,<2.19.0
+tf-keras>=2.16.0
+gunicorn
+supabase
 pillow
-pyttsx3
