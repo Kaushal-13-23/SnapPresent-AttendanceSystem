@@ -9,6 +9,7 @@ export const GOOGLE_SHEET_CONFIG = {
   SHEET_ID: '1BKAkxy-3k-08gQ6jKjunmCmE45YwoXmIRax5RpVnzGc',
   SHEET_NAME: 'Main',
   VIEW_URL: 'https://docs.google.com/spreadsheets/d/1BKAkxy-3k-08gQ6jKjunmCmE45YwoXmIRax5RpVnzGc/edit?usp=sharing',
+  DEFAULT_WEBHOOK_URL: 'https://script.google.com/macros/s/AKfycby-sOZcU_CkIoJ9f1676JNBKgaL0xAegYpzoqHr-UEgOI-6v9DFfVN-YD6E3QsPEVAkSA/exec',
 };
 
 export interface SheetAttendanceRow {
@@ -30,7 +31,7 @@ export interface SheetAttendanceRow {
  * Non-blocking: will never crash or delay the facial recognition loop.
  */
 export async function syncToGoogleSheets(rows: SheetAttendanceRow[]): Promise<boolean> {
-  const webhookUrl = process.env.GOOGLE_SHEETS_WEBHOOK_URL;
+  const webhookUrl = process.env.GOOGLE_SHEETS_WEBHOOK_URL || GOOGLE_SHEET_CONFIG.DEFAULT_WEBHOOK_URL;
   if (!webhookUrl || rows.length === 0) {
     return false;
   }
