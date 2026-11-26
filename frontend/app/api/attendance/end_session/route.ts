@@ -4,7 +4,7 @@ import { supabaseServer } from '@/lib/supabase-server';
 const BACKEND_URL =
   process.env.BACKEND_URL ||
   process.env.NEXT_PUBLIC_API_URL ||
-  'https://snappresent-backend.onrender.com';
+  'https://snappresent-attendancesystem-production.up.railway.app';
 
 export async function POST(request: Request) {
   try {

@@ -86,11 +86,20 @@ def api_signin():
     
     # Find user in appropriate collection
     user = auth_col.find_one({'email': email})
-    
+
+    # If not found under specified user_type, check the alternate collection
+    if not user:
+        alt_col = db.auth_users if user_type == 'teacher' else db.auth_teachers
+        alt_user = alt_col.find_one({'email': email})
+        if alt_user:
+            user = alt_user
+            user_type = 'student' if user_type == 'teacher' else 'teacher'
+            user_role = user_type
+
     if not user:
         return jsonify({
             "success": False, 
-            "error": f"No {user_type} account found with this email"
+            "error": "No account found with this email. Please check your email or sign up."
         }), 401
     
     # Check password

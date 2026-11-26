@@ -59,11 +59,11 @@ export async function POST(request: Request) {
 
     const recordId = existingStudent?.id || crypto.randomUUID();
 
-    // 3. Forward to Render AI backend to run MTCNN face detection and DeepFace Facenet512 feature extraction
+    // 3. Forward to Railway AI backend to run MTCNN face detection and DeepFace Facenet512 feature extraction
     const backendUrl =
       process.env.BACKEND_URL ||
       process.env.NEXT_PUBLIC_API_URL ||
-      'https://snappresent-backend.onrender.com';
+      'https://snappresent-attendancesystem-production.up.railway.app';
 
     let renderRes: Response;
     try {
