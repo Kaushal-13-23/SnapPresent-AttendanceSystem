@@ -548,7 +548,6 @@ def mark_attendance_with_duplicate_prevention():
                 "duplicates_prevented": int(sum(1 for r in results if r.get("status") == "duplicate"))
             }
         }))
-        })
 
     except Exception as e:
         logger.error(f"Attendance error: {e}")
