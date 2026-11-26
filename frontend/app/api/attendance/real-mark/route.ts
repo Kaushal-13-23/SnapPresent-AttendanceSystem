@@ -119,7 +119,11 @@ export async function POST(request: Request) {
                 confidence: f.confidence ?? 95,
               })
             );
-            syncToGoogleSheets(sheetRows).catch(() => {});
+            try {
+              await syncToGoogleSheets(sheetRows);
+            } catch (err) {
+              console.warn('Google Sheets background sync error:', err);
+            }
           }
         } catch (syncErr) {
           console.error('Error syncing marked faces to Supabase/Sheets:', syncErr);
