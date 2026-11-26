@@ -23,6 +23,20 @@ attendance_session_bp = Blueprint(
 
 # ----------------- OPTIMIZED Helper Functions ----------------- #
 
+def sanitize_for_json(data):
+    """Recursively convert numpy types to standard Python types for JSON serialization"""
+    if isinstance(data, dict):
+        return {k: sanitize_for_json(v) for k, v in data.items()}
+    elif isinstance(data, (list, tuple)):
+        return [sanitize_for_json(v) for v in data]
+    elif isinstance(data, (np.floating, float)):
+        return float(data)
+    elif isinstance(data, (np.integer, int)):
+        return int(data)
+    elif isinstance(data, np.ndarray):
+        return sanitize_for_json(data.tolist())
+    return data
+
 def read_image_from_base64_optimized(image_b64: str, target_size=(640, 480)):
     """Convert base64 image to RGB numpy array with optimization"""
     if image_b64.startswith("data:"):
@@ -444,10 +458,10 @@ def mark_attendance_with_duplicate_prevention():
                 if student_id in already_present_students:
                     # Student already marked present in this session
                     results.append({
-                        "match": {"user_id": student_id, "name": student_name},
+                        "match": {"user_id": str(student_id), "name": str(student_name)},
                         "distance": round(float(min_d), 4),
-                        "confidence": round((1 - min_d) * 100, 1),
-                        "box": f["box"],
+                        "confidence": round(float((1 - min_d) * 100), 1),
+                        "box": [int(b) for b in f["box"]],
                         "already_marked": True,
                         "status": "duplicate",
                         "message": f"{student_name} is already marked present in this session"
@@ -474,10 +488,10 @@ def mark_attendance_with_duplicate_prevention():
                     # Successfully marked present
                     already_present_students.add(student_id)
                     results.append({
-                        "match": {"user_id": student_id, "name": student_name},
+                        "match": {"user_id": str(student_id), "name": str(student_name)},
                         "distance": round(float(min_d), 4),
-                        "confidence": round((1 - min_d) * 100, 1),
-                        "box": f["box"],
+                        "confidence": round(float((1 - min_d) * 100), 1),
+                        "box": [int(b) for b in f["box"]],
                         "already_marked": False,
                         "status": "marked_present",
                         "message": f"{student_name} marked present successfully"
@@ -490,8 +504,8 @@ def mark_attendance_with_duplicate_prevention():
                         {"id": clean_session_id},
                         {"$push": {
                             "students": {
-                                "student_id": student_id,
-                                "student_name": student_name,
+                                "student_id": str(student_id),
+                                "student_name": str(student_name),
                                 "present": True,
                                 "marked_at": now_str
                             }
@@ -499,10 +513,10 @@ def mark_attendance_with_duplicate_prevention():
                     )
                     already_present_students.add(student_id)
                     results.append({
-                        "match": {"user_id": student_id, "name": student_name},
+                        "match": {"user_id": str(student_id), "name": str(student_name)},
                         "distance": round(float(min_d), 4),
-                        "confidence": round((1 - min_d) * 100, 1),
-                        "box": f["box"],
+                        "confidence": round(float((1 - min_d) * 100), 1),
+                        "box": [int(b) for b in f["box"]],
                         "already_marked": False,
                         "status": "marked_present_new",
                         "message": f"{student_name} added to session and marked present"
@@ -514,25 +528,26 @@ def mark_attendance_with_duplicate_prevention():
                 results.append({
                     "match": None, 
                     "distance": round(float(min_d), 4) if min_d != float('inf') else None,
-                    "confidence": round((1 - min_d) * 100, 1) if min_d != float('inf') else None,
-                    "box": f["box"],
+                    "confidence": round(float((1 - min_d) * 100), 1) if min_d != float('inf') else None,
+                    "box": [int(b) for b in f["box"]],
                     "status": "no_match",
                     "message": "Face not recognized"
                 })
 
         processing_time = time.time() - start_time
         
-        # Return comprehensive response
-        return jsonify({
+        # Return comprehensive sanitized response
+        return jsonify(sanitize_for_json({
             "message": "Recognition processed", 
             "faces": results, 
-            "processing_time": round(processing_time, 3),
+            "processing_time": round(float(processing_time), 3),
             "session_info": {
-                "session_id": session_id,
-                "total_present_now": len(already_present_students),
-                "faces_detected": len(faces),
-                "duplicates_prevented": sum(1 for r in results if r.get("status") == "duplicate")
+                "session_id": str(session_id),
+                "total_present_now": int(len(already_present_students)),
+                "faces_detected": int(len(faces)),
+                "duplicates_prevented": int(sum(1 for r in results if r.get("status") == "duplicate"))
             }
+        }))
         })
 
     except Exception as e:

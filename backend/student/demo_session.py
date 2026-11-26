@@ -14,6 +14,20 @@ logger = logging.getLogger(__name__)
 
 demo_session_bp = Blueprint("demo_session", __name__)
 
+def sanitize_for_json(data):
+    """Recursively convert numpy types to standard Python types for JSON serialization"""
+    if isinstance(data, dict):
+        return {k: sanitize_for_json(v) for k, v in data.items()}
+    elif isinstance(data, (list, tuple)):
+        return [sanitize_for_json(v) for v in data]
+    elif isinstance(data, (np.floating, float)):
+        return float(data)
+    elif isinstance(data, (np.integer, int)):
+        return int(data)
+    elif isinstance(data, np.ndarray):
+        return sanitize_for_json(data.tolist())
+    return data
+
 def read_image_from_bytes_optimized(b, target_size=(640, 480)):
     """Optimized image reading with size constraints"""
     img = Image.open(io.BytesIO(b)).convert("RGB")
@@ -228,19 +242,19 @@ def demo_recognize_optimized():
 
     total_time = time.time() - start_time
 
-    return jsonify({
+    return jsonify(sanitize_for_json({
         "success": True, 
         "faces": results, 
-        "processing_time": round(total_time, 3),
+        "processing_time": round(float(total_time), 3),
         "detailed_timing": {
-            "detection": round(detection_time, 3),
-            "total": round(total_time, 3)
+            "detection": round(float(detection_time), 3),
+            "total": round(float(total_time), 3)
         },
         "performance_info": {
             "models_preloaded": True,
             "cache_enabled": True
         }
-    })
+    }))
 
 @demo_session_bp.route('/api/demo/session', methods=['POST'])
 def create_demo_session():
